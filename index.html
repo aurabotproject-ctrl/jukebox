@@ -693,6 +693,7 @@
   var LIB_KEY = "jukebox:library";
   var QUEUE_KEY = "jukebox:queue";
   var PLAYLIST_KEY = "jukebox:playlistid";
+  var CURRENT_KEY = "jukebox:current";
 
   var state = {
     library: [],
@@ -709,19 +710,61 @@
   var lastQueueStr = "";
 
   // ---------- Storage helpers ----------
-  async function loadShared(key, fallback){
+  // This page always keeps a copy of everything in this browser's
+  // localStorage, so your library/queue/now-playing survive closing the
+  // tab or the whole browser and come back automatically next time you
+  // open the page — no "save" click required.
+  //
+  // If this page happens to be running somewhere that also exposes the
+  // optional window.storage cloud API (e.g. as a Claude artifact), it's
+  // used too, so a queue can additionally sync live across multiple
+  // devices in a classroom. But localStorage is the source of truth that
+  // always works, even with that API absent.
+  var hasCloudStorage = (typeof window.storage !== "undefined" && window.storage &&
+    typeof window.storage.get === "function" && typeof window.storage.set === "function");
+
+  function lsGetJSON(key, fallback){
     try{
-      var res = await window.storage.get(key, true);
-      if(res && res.value){
-        return JSON.parse(res.value);
-      }
-    }catch(e){ /* key not found or storage unavailable */ }
+      var raw = localStorage.getItem(key);
+      if(raw !== null) return JSON.parse(raw);
+    }catch(e){ /* corrupt or unavailable */ }
     return fallback;
   }
-  async function saveShared(key, value){
+  function lsSetJSON(key, value){
+    try{ localStorage.setItem(key, JSON.stringify(value)); }
+    catch(e){ console.error("localStorage set failed", key, e); }
+  }
+  function lsGetRaw(key, fallback){
     try{
-      await window.storage.set(key, JSON.stringify(value), true);
-    }catch(e){ console.error("storage set failed", key, e); }
+      var raw = localStorage.getItem(key);
+      if(raw !== null) return raw;
+    }catch(e){ /* unavailable */ }
+    return fallback;
+  }
+  function lsSetRaw(key, value){
+    try{ localStorage.setItem(key, value); }
+    catch(e){ console.error("localStorage set failed", key, e); }
+  }
+
+  async function loadShared(key, fallback){
+    if(hasCloudStorage){
+      try{
+        var res = await window.storage.get(key, true);
+        if(res && res.value){
+          var parsed = JSON.parse(res.value);
+          lsSetJSON(key, parsed); // keep localStorage in sync as backup
+          return parsed;
+        }
+      }catch(e){ /* key not found or storage unavailable */ }
+    }
+    return lsGetJSON(key, fallback);
+  }
+  async function saveShared(key, value){
+    lsSetJSON(key, value); // always persist locally so it survives closing the browser
+    if(hasCloudStorage){
+      try{ await window.storage.set(key, JSON.stringify(value), true); }
+      catch(e){ console.error("storage set failed", key, e); }
+    }
   }
 
   // ---------- YouTube helpers ----------
@@ -953,6 +996,7 @@
     state.current = { videoId: next.videoId, title: next.title, thumb: next.thumb };
     renderQueue();
     await saveShared(QUEUE_KEY, state.queue);
+    await saveShared(CURRENT_KEY, state.current);
     loadCurrentIntoPlayer(true);
     renderNowPlaying();
   }
@@ -993,6 +1037,7 @@
           title: data.title || "Untitled",
           thumb: thumbFor(data.video_id)
         };
+        saveShared(CURRENT_KEY, state.current);
         renderNowPlaying();
       }
     }
@@ -1016,6 +1061,7 @@
     state.current = null;
     state.isPlaying = false;
     if(playerReady && player && player.stopVideo) player.stopVideo();
+    await saveShared(CURRENT_KEY, state.current);
     renderNowPlaying();
   }
 
@@ -1103,15 +1149,23 @@
   var SAVED_LIB_KEY = "jukebox:savedlibrary";
 
   async function loadPersonal(key, fallback){
-    try{
-      var res = await window.storage.get(key, false);
-      if(res && res.value !== undefined) return res.value;
-    }catch(e){}
-    return fallback;
+    if(hasCloudStorage){
+      try{
+        var res = await window.storage.get(key, false);
+        if(res && res.value !== undefined){
+          lsSetRaw(key, res.value);
+          return res.value;
+        }
+      }catch(e){}
+    }
+    return lsGetRaw(key, fallback);
   }
   async function savePersonal(key, value){
-    try{ await window.storage.set(key, value, false); }
-    catch(e){ console.error("personal storage set failed", key, e); }
+    lsSetRaw(key, value);
+    if(hasCloudStorage){
+      try{ await window.storage.set(key, value, false); }
+      catch(e){ console.error("personal storage set failed", key, e); }
+    }
   }
 
   function handleDownloadLibrary(){
@@ -1403,6 +1457,7 @@
     state.library = await loadShared(LIB_KEY, []);
     state.queue = await loadShared(QUEUE_KEY, []);
     state.playlistId = await loadShared(PLAYLIST_KEY, null);
+    state.current = await loadShared(CURRENT_KEY, null);
     if(state.playlistId) document.getElementById("playlistUrlInput").value = state.playlistId;
     renderLibrary();
     renderQueue();
