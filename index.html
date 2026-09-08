@@ -106,32 +106,57 @@
     flex-direction:column;
     position:relative;
   }
-  .screen-wrap:fullscreen{
-    padding:0;
+  /* Fullscreen mode: the whole cabinet (video + vinyl + now-playing) goes fullscreen */
+  .cabinet:fullscreen{
+    width:100vw;
+    height:100vh;
+    max-width:none;
+    max-height:none;
     border:none;
     border-radius:0;
+    padding:26px;
     background:#000;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    box-shadow:none;
+  }
+  .cabinet:-webkit-full-screen{
+    width:100vw; height:100vh; max-width:none; max-height:none;
+    border:none; border-radius:0; padding:26px; background:#000;
+    display:flex; flex-direction:column; justify-content:center; box-shadow:none;
+  }
+  .cabinet:fullscreen::before, .cabinet:-webkit-full-screen::before{ display:none; }
+  .cabinet:fullscreen .display-row, .cabinet:-webkit-full-screen .display-row{
+    flex:1 1 auto;
+    min-height:0;
+  }
+  .cabinet:fullscreen .screen-wrap, .cabinet:-webkit-full-screen .screen-wrap{
+    flex:1 1 auto;
+    min-height:0;
+    height:100%;
     display:flex;
     align-items:center;
     justify-content:center;
   }
-  .screen-wrap:-webkit-full-screen{
-    padding:0; border:none; background:#000;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .screen-wrap:fullscreen .screen{
+  .cabinet:fullscreen .screen, .cabinet:-webkit-full-screen .screen{
     width:100%;
     height:100%;
     aspect-ratio:auto;
-    border-radius:0;
   }
-  .screen-wrap:-webkit-full-screen .screen{
-    width:100%; height:100%; border-radius:0;
+  .cabinet:fullscreen .vinyl-wrap, .cabinet:-webkit-full-screen .vinyl-wrap{
+    flex:0 0 200px;
+  }
+  .cabinet:fullscreen .vinyl, .cabinet:-webkit-full-screen .vinyl{
+    width:170px; height:170px;
+  }
+  .cabinet:fullscreen .now-playing, .cabinet:-webkit-full-screen .now-playing{
+    flex:0 0 auto;
   }
   .fullscreen-btn{
     position:absolute;
-    top:20px; right:20px;
-    z-index:5;
+    top:16px; right:16px;
+    z-index:6;
     background:rgba(12,10,9,0.75);
     border:1px solid var(--chrome-3);
     color:var(--cream);
@@ -548,10 +573,10 @@
     <p>PICK · QUEUE · PLAY</p>
   </div>
 
-  <div class="cabinet">
+  <div class="cabinet" id="cabinet">
+    <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="Fullscreen the player">⛶</button>
     <div class="display-row">
       <div class="screen-wrap" id="screenWrap">
-        <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
         <div class="screen" id="screen">
           <div class="empty-state" id="emptyState">
             <div class="big">Nothing's spinning yet</div>
@@ -845,7 +870,7 @@
 
   // ---------- Fullscreen ----------
   function toggleFullscreen(){
-    var el = document.getElementById("screenWrap");
+    var el = document.getElementById("cabinet");
     var isFs = document.fullscreenElement || document.webkitFullscreenElement;
     if(!isFs){
       if(el.requestFullscreen) el.requestFullscreen();
