@@ -488,8 +488,26 @@
   }
   .lib-card .thumb{
     width:100%; aspect-ratio:1/1; overflow:hidden; background:#1b1512;
+    position:relative;
   }
   .lib-card .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .lib-card .thumb .lib-delete{
+    position:absolute;
+    top:5px; right:5px;
+    width:22px; height:22px;
+    border-radius:6px;
+    background:rgba(12,10,9,0.8);
+    border:1px solid rgba(255,255,255,0.15);
+    color:var(--cream);
+    font-size:13px;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    padding:0;
+  }
+  .lib-card .thumb .lib-delete:hover{ background:var(--neon-pink); border-color:var(--neon-pink); color:#fff; }
   .lib-card .info{ padding:8px 9px 10px; display:flex; flex-direction:column; gap:6px; flex:1; }
   .lib-card .title{
     font-size:12.5px; font-weight:600; line-height:1.3;
@@ -797,13 +815,18 @@
       var card = document.createElement("div");
       card.className = "lib-card";
       card.innerHTML =
-        '<div class="thumb"><img src="' + song.thumb + '" alt="" loading="lazy"></div>' +
+        '<div class="thumb"><img src="' + song.thumb + '" alt="" loading="lazy">' +
+          '<button type="button" class="lib-delete" title="Remove from library">✕</button>' +
+        '</div>' +
         '<div class="info">' +
           '<div class="title">' + escapeHtml(song.title) + '</div>' +
-          '<button type="button">+ Queue</button>' +
+          '<button type="button" class="queue-btn">+ Queue</button>' +
         '</div>';
-      card.querySelector("button").addEventListener("click", function(){
+      card.querySelector(".queue-btn").addEventListener("click", function(){
         addToQueue(song);
+      });
+      card.querySelector(".lib-delete").addEventListener("click", function(){
+        removeFromLibrary(song);
       });
       grid.appendChild(card);
     });
@@ -905,6 +928,14 @@
     state.queue = state.queue.filter(function(q){ return q.qid !== qid; });
     renderQueue();
     await saveShared(QUEUE_KEY, state.queue);
+  }
+
+  async function removeFromLibrary(song){
+    var ok = window.confirm('Remove "' + song.title + '" from the shared library?');
+    if(!ok) return;
+    state.library = state.library.filter(function(s){ return s.videoId !== song.videoId; });
+    renderLibrary();
+    await saveShared(LIB_KEY, state.library);
   }
 
   function maybeStartNext(){
