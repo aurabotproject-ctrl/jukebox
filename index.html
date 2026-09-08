@@ -469,14 +469,38 @@
     margin:-6px 0 10px;
   }
 
-  /* Library grid */
+  /* Library list — single-column, vertically scrolling "carousel" */
   .library-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));
-    gap:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
     max-height:480px;
     overflow-y:auto;
     padding-right:4px;
+    scroll-behavior:smooth;
+  }
+  .lib-view-toggle{
+    display:flex;
+    gap:6px;
+    margin:-2px 0 10px;
+  }
+  .lib-view-toggle .view-btn{
+    background:#161210;
+    border:1px solid #2b211a;
+    color:#a08d76;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    padding:6px 12px;
+    border-radius:999px;
+    cursor:pointer;
+    font-family:'Space Grotesk', sans-serif;
+  }
+  .lib-view-toggle .view-btn:hover{ color:var(--cream); border-color:var(--chrome-3); }
+  .lib-view-toggle .view-btn.active{
+    background:linear-gradient(180deg, var(--neon-teal), #16a596);
+    border-color:transparent;
+    color:#03231f;
   }
   .lib-card{
     background:#0c0a09;
@@ -484,21 +508,63 @@
     border:1px solid #2b211a;
     overflow:hidden;
     display:flex;
-    flex-direction:column;
+    flex-direction:row;
+    align-items:center;
+    gap:10px;
+    padding:8px;
   }
   .lib-card .thumb{
-    width:100%; aspect-ratio:1/1; overflow:hidden; background:#1b1512;
-    position:relative;
+    width:52px; height:52px; flex:0 0 52px;
+    overflow:hidden; background:#1b1512;
+    border-radius:7px;
   }
   .lib-card .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .lib-card .thumb .lib-delete{
-    position:absolute;
-    top:5px; right:5px;
-    width:22px; height:22px;
-    border-radius:6px;
-    background:rgba(12,10,9,0.8);
-    border:1px solid rgba(255,255,255,0.15);
+  .lib-card .info{
+    flex:1 1 auto;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .lib-card .title{
+    font-size:13px; font-weight:600; line-height:1.3;
     color:var(--cream);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .lib-card .artist{
+    font-size:11.5px;
+    color:#a08d76;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .lib-card .actions{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .lib-card .queue-btn{
+    background:linear-gradient(180deg, var(--neon-teal), #16a596);
+    border:none;
+    color:#03231f;
+    font-weight:700;
+    font-size:11px;
+    padding:7px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .lib-card .queue-btn:hover{ filter:brightness(1.08); }
+  .lib-card .lib-delete{
+    width:26px; height:26px;
+    flex:0 0 26px;
+    border-radius:6px;
+    background:transparent;
+    border:1px solid #2b211a;
+    color:#a08d76;
     font-size:13px;
     line-height:1;
     display:flex;
@@ -507,29 +573,12 @@
     cursor:pointer;
     padding:0;
   }
-  .lib-card .thumb .lib-delete:hover{ background:var(--neon-pink); border-color:var(--neon-pink); color:#fff; }
-  .lib-card .info{ padding:8px 9px 10px; display:flex; flex-direction:column; gap:6px; flex:1; }
-  .lib-card .title{
-    font-size:12.5px; font-weight:600; line-height:1.3;
-    color:var(--cream);
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
-    min-height:2.6em;
-  }
-  .lib-card button{
-    margin-top:auto;
-    background:linear-gradient(180deg, var(--neon-teal), #16a596);
-    border:none;
-    color:#03231f;
-    font-weight:700;
-    font-size:11.5px;
-    padding:7px 8px;
-    border-radius:6px;
-    cursor:pointer;
-  }
-  .lib-card button:hover{ filter:brightness(1.08); }
+  .lib-card .lib-delete:hover{ background:var(--neon-pink); border-color:var(--neon-pink); color:#fff; }
+
+  /* Details-only view: no thumbnails, tighter compact rows */
+  .library-grid.details-view .lib-card{ padding:7px 10px; }
+  .library-grid.details-view .thumb{ display:none; }
+  .library-grid.details-view .title{ font-size:13px; }
   .lib-empty, .queue-empty{
     color:#79695a; font-size:13px; padding:20px 4px; text-align:center;
   }
@@ -672,6 +721,10 @@
         </div>
       </div>
       <div class="panel-status" id="libSaveStatus"></div>
+      <div class="lib-view-toggle" id="libViewToggle">
+        <button type="button" class="view-btn" data-view="icons" id="viewIconsBtn">🖼 Icons</button>
+        <button type="button" class="view-btn" data-view="details" id="viewDetailsBtn">📄 Details only</button>
+      </div>
       <div class="library-grid" id="libraryGrid">
         <div class="lib-empty">No songs added yet. Paste a link above to get started.</div>
       </div>
@@ -846,24 +899,62 @@
     });
   }
 
+  var LIB_VIEW_KEY = "jukebox:libraryview";
+  var libraryView = lsGetRaw(LIB_VIEW_KEY, "icons"); // "icons" | "details"
+
+  function setLibraryView(view){
+    libraryView = (view === "details") ? "details" : "icons";
+    lsSetRaw(LIB_VIEW_KEY, libraryView);
+    updateLibraryViewButtons();
+    renderLibrary();
+  }
+  function updateLibraryViewButtons(){
+    var iconsBtn = document.getElementById("viewIconsBtn");
+    var detailsBtn = document.getElementById("viewDetailsBtn");
+    if(!iconsBtn || !detailsBtn) return;
+    iconsBtn.classList.toggle("active", libraryView === "icons");
+    detailsBtn.classList.toggle("active", libraryView === "details");
+  }
+
+  // Splits a YouTube video title like "Artist - Song Name" into parts.
+  // Falls back to showing the whole title as the song name if no
+  // recognizable separator is found.
+  function splitArtistTitle(title){
+    var seps = [" - ", " – ", " — ", " | "];
+    for(var i=0;i<seps.length;i++){
+      var idx = title.indexOf(seps[i]);
+      if(idx > 0){
+        return {
+          artist: title.slice(0, idx).trim(),
+          name: title.slice(idx + seps[i].length).trim()
+        };
+      }
+    }
+    return { artist: "", name: title };
+  }
+
   // ---------- Rendering ----------
   function renderLibrary(){
     var grid = document.getElementById("libraryGrid");
+    grid.className = "library-grid " + (libraryView === "details" ? "details-view" : "icons-view");
     if(state.library.length === 0){
       grid.innerHTML = '<div class="lib-empty">No songs added yet. Paste a link above to get started.</div>';
       return;
     }
     grid.innerHTML = "";
     state.library.forEach(function(song){
+      var parts = splitArtistTitle(song.title);
       var card = document.createElement("div");
       card.className = "lib-card";
       card.innerHTML =
-        '<div class="thumb"><img src="' + song.thumb + '" alt="" loading="lazy">' +
-          '<button type="button" class="lib-delete" title="Remove from library">✕</button>' +
-        '</div>' +
+        '<div class="thumb"><img src="' + song.thumb + '" alt="" loading="lazy"></div>' +
         '<div class="info">' +
-          '<div class="title">' + escapeHtml(song.title) + '</div>' +
-          '<button type="button" class="queue-btn">+ Queue</button>' +
+          '<div class="title">' + escapeHtml(parts.name) + '</div>' +
+          (parts.artist ? '<div class="artist">' + escapeHtml(parts.artist) + '</div>' : '') +
+        '</div>' +
+        '<div class="actions">' +
+          '<button type="button" class="queue-btn" title="Add to queue">+ Queue</button>' +
+          '<button type="button" class="lib-delete" title="Remove from library">✕</button>' +
         '</div>';
       card.querySelector(".queue-btn").addEventListener("click", function(){
         addToQueue(song);
@@ -1446,6 +1537,9 @@
     document.getElementById("saveLibBtn").addEventListener("click", handleSaveLibrary);
     document.getElementById("restoreLibBtn").addEventListener("click", handleRestoreLibrary);
     document.getElementById("downloadLibBtn").addEventListener("click", handleDownloadLibrary);
+    document.getElementById("viewIconsBtn").addEventListener("click", function(){ setLibraryView("icons"); });
+    document.getElementById("viewDetailsBtn").addEventListener("click", function(){ setLibraryView("details"); });
+    updateLibraryViewButtons();
     document.getElementById("loadLibBtn").addEventListener("click", function(){
       document.getElementById("loadLibFile").click();
     });
