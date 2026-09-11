@@ -461,6 +461,7 @@
     white-space:nowrap;
   }
   .small-btn:hover{ border-color:var(--neon-teal); color:var(--neon-teal); }
+  .small-btn.danger-btn:hover{ border-color:var(--neon-pink); color:var(--neon-pink); }
   .panel-status{
     font-size:11px;
     color:var(--neon-teal);
@@ -723,6 +724,7 @@
           <button type="button" class="small-btn" id="downloadLibBtn">⬇ Download JSON</button>
           <button type="button" class="small-btn" id="loadLibBtn">⬆ Load JSON</button>
           <input type="file" id="loadLibFile" accept=".json,application/json" style="display:none;" />
+          <button type="button" class="small-btn danger-btn" id="clearLibBtn">🗑 Clear Songs</button>
         </div>
       </div>
       <div class="panel-status" id="libSaveStatus"></div>
@@ -752,6 +754,38 @@
   var QUEUE_KEY = "jukebox:queue";
   var PLAYLIST_KEY = "jukebox:playlistid";
   var CURRENT_KEY = "jukebox:current";
+
+  // Starter song list. This loads automatically the first time the app
+  // is opened (before anyone has saved their own shared library yet).
+  // Once a library exists in storage, this default is never applied again,
+  // so it won't stomp on anything that's been added or removed since.
+  var DEFAULT_LIBRARY = [
+    { id: "s_BXn_QqI6BmU", videoId: "BXn_QqI6BmU", title: "SON. Music ft Neeja - Darling Jesus (Lyrics) || Just Lyrically", thumb: "https://img.youtube.com/vi/BXn_QqI6BmU/hqdefault.jpg" },
+    { id: "s_9v25xPAvfMM", videoId: "9v25xPAvfMM", title: "Umbrella - Moses Bliss x Festizie, Chizie, Son, Neeja, Membrane, Doris Joseph, Ajay & Godfrey Gad", thumb: "https://img.youtube.com/vi/9v25xPAvfMM/hqdefault.jpg" },
+    { id: "s_q_vHouy88bs", videoId: "q_vHouy88bs", title: "Lauren Daigle - These Are The Days (Official Lyric Video)", thumb: "https://img.youtube.com/vi/q_vHouy88bs/hqdefault.jpg" },
+    { id: "s_0qXn2I449qs", videoId: "0qXn2I449qs", title: "Jeremy Camp - These Days (Lyric Video)", thumb: "https://img.youtube.com/vi/0qXn2I449qs/hqdefault.jpg" },
+    { id: "s_i-ajM6XIyZQ", videoId: "i-ajM6XIyZQ", title: "Phil Wickham - Psalm 8 (Hallé) [Official Lyric Video]", thumb: "https://img.youtube.com/vi/i-ajM6XIyZQ/hqdefault.jpg" },
+    { id: "s_lDiCDv2isbU", videoId: "lDiCDv2isbU", title: "Phil Wickham - What An Awesome God (Lyrics)", thumb: "https://img.youtube.com/vi/lDiCDv2isbU/hqdefault.jpg" },
+    { id: "s_AtzBjaXP2SQ", videoId: "AtzBjaXP2SQ", title: "Phil Wickham - It Really Is Amazing Grace (feat. Crowder) (Lyrics Video)", thumb: "https://img.youtube.com/vi/AtzBjaXP2SQ/hqdefault.jpg" },
+    { id: "s_UKfESyIttog", videoId: "UKfESyIttog", title: "CalledOut Music - DAY BY DAY [Official Lyric Video]", thumb: "https://img.youtube.com/vi/UKfESyIttog/hqdefault.jpg" },
+    { id: "s_7RIp_t3gKZw", videoId: "7RIp_t3gKZw", title: "TobyMac ~ Everything (Lyrics)", thumb: "https://img.youtube.com/vi/7RIp_t3gKZw/hqdefault.jpg" },
+    { id: "s_U3BjpssMlm0", videoId: "U3BjpssMlm0", title: "Jordan Feliz - Joyful Noise (with lyrics)(2024)", thumb: "https://img.youtube.com/vi/U3BjpssMlm0/hqdefault.jpg" },
+    { id: "s_yiUCKeY5QD0", videoId: "yiUCKeY5QD0", title: "Help Is On The Way (Maybe Midnight) by TobyMac [Lyric Video]", thumb: "https://img.youtube.com/vi/yiUCKeY5QD0/hqdefault.jpg" },
+    { id: "s_9cZE-_0seRY", videoId: "9cZE-_0seRY", title: "No Longer Bound (I’m Free) Mav City, Chandler Moore, & Forrest Frank | Official Lyric Video", thumb: "https://img.youtube.com/vi/9cZE-_0seRY/hqdefault.jpg" },
+    { id: "s_iHmV3ANIAs8", videoId: "iHmV3ANIAs8", title: "Hollyn - Love With Your Life - (with lyrics) (2017)", thumb: "https://img.youtube.com/vi/iHmV3ANIAs8/hqdefault.jpg" },
+    { id: "s_sHMMs8j_ezs", videoId: "sHMMs8j_ezs", title: "Forrest Frank - YOUR WAY’S BETTER (Lyrics)", thumb: "https://img.youtube.com/vi/sHMMs8j_ezs/hqdefault.jpg" },
+    { id: "s_9KM9pIj8BFQ", videoId: "9KM9pIj8BFQ", title: "Danny Gokey - Sound Of Heaven (Lyrics)", thumb: "https://img.youtube.com/vi/9KM9pIj8BFQ/hqdefault.jpg" },
+    { id: "s_WTFcFP0c4_E", videoId: "WTFcFP0c4_E", title: "Forrest Frank, CAIN - SAFE AND SOUND (Lyrics)", thumb: "https://img.youtube.com/vi/WTFcFP0c4_E/hqdefault.jpg" },
+    { id: "s_qkVK0lvsdWI", videoId: "qkVK0lvsdWI", title: "Josh Wilson - Revolutionary Lyrics", thumb: "https://img.youtube.com/vi/qkVK0lvsdWI/hqdefault.jpg" },
+    { id: "s_vxPun3LlD-w", videoId: "vxPun3LlD-w", title: "MIRACLE TAUREN WELLS LYRIC VIDEO", thumb: "https://img.youtube.com/vi/vxPun3LlD-w/hqdefault.jpg" },
+    { id: "s_pCE54ajDXhY", videoId: "pCE54ajDXhY", title: "TobyMac - Nothin’ Sweeter (Lyric Video)", thumb: "https://img.youtube.com/vi/pCE54ajDXhY/hqdefault.jpg" },
+    { id: "s_1gr8PmRGzxA", videoId: "1gr8PmRGzxA", title: "Colton Dixon - Miracles (Lyrics)", thumb: "https://img.youtube.com/vi/1gr8PmRGzxA/hqdefault.jpg" },
+    { id: "s_h4ekl5b_59A", videoId: "h4ekl5b_59A", title: "I just need U - [Lyric Video] TobyMac", thumb: "https://img.youtube.com/vi/h4ekl5b_59A/hqdefault.jpg" },
+    { id: "s_UiRaLElPLBg", videoId: "UiRaLElPLBg", title: "I Know You Can | Radio Single Lyric Video | Planetshakers", thumb: "https://img.youtube.com/vi/UiRaLElPLBg/hqdefault.jpg" },
+    { id: "s_lq51vgYl8yE", videoId: "lq51vgYl8yE", title: "Joseph O'Brien - Take Your Time (Lyrics)", thumb: "https://img.youtube.com/vi/lq51vgYl8yE/hqdefault.jpg" },
+    { id: "s_U-UrzZ07dcE", videoId: "U-UrzZ07dcE", title: "Forrest Frank & JVKE - NEVER GET USED TO THIS (Lyrics)", thumb: "https://img.youtube.com/vi/U-UrzZ07dcE/hqdefault.jpg" },
+    { id: "s_JdnkEOcGqug", videoId: "JdnkEOcGqug", title: "Benjamin William Hastings, Aodhán King - What a friend (Official Lyric Video)", thumb: "https://img.youtube.com/vi/JdnkEOcGqug/hqdefault.jpg" }
+  ];
 
   var state = {
     library: [],
@@ -1283,6 +1317,25 @@
     return song && typeof song.videoId === "string" && typeof song.title === "string";
   }
 
+  async function handleClearLibrary(){
+    var status = document.getElementById("libSaveStatus");
+    if(state.library.length === 0){
+      status.style.color = "var(--cream-dim)";
+      status.textContent = "The library is already empty.";
+      return;
+    }
+    var ok = window.confirm(
+      "Clear all " + state.library.length + " song" + (state.library.length === 1 ? "" : "s") +
+      " from the shared library? This can't be undone (unless you've downloaded a JSON backup)."
+    );
+    if(!ok) return;
+    state.library = [];
+    renderLibrary();
+    await saveShared(LIB_KEY, state.library);
+    status.style.color = "var(--neon-teal)";
+    status.textContent = "Library cleared. Paste a link above to start a fresh list.";
+  }
+
   async function handleLoadLibraryFile(event){
     var status = document.getElementById("libSaveStatus");
     var file = event.target.files && event.target.files[0];
@@ -1549,11 +1602,17 @@
       document.getElementById("loadLibFile").click();
     });
     document.getElementById("loadLibFile").addEventListener("change", handleLoadLibraryFile);
+    document.getElementById("clearLibBtn").addEventListener("click", handleClearLibrary);
 
     var savedKey = await loadPersonal(API_KEY_KEY, "");
     if(savedKey) document.getElementById("apiKeyInput").value = savedKey;
 
-    state.library = await loadShared(LIB_KEY, []);
+    state.library = await loadShared(LIB_KEY, null);
+    if(state.library === null){
+      // First time this jukebox has ever been opened: seed the starter list.
+      state.library = DEFAULT_LIBRARY.slice();
+      await saveShared(LIB_KEY, state.library);
+    }
     state.queue = await loadShared(QUEUE_KEY, []);
     state.playlistId = await loadShared(PLAYLIST_KEY, null);
     state.current = await loadShared(CURRENT_KEY, null);
